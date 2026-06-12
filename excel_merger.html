@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel 結合ツール</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f0f2f5;
+    color: #222;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  h1 { text-align: center; font-size: 1.6rem; font-weight: 700; margin-bottom: 8px; color: #1a1a2e; }
+  .subtitle { text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 32px; }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    padding: 24px;
+    margin-bottom: 20px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .card h2 {
+    font-size: 1rem; font-weight: 600; margin-bottom: 16px;
+    color: #333; display: flex; align-items: center; gap: 8px;
+  }
+
+  .step-badge {
+    background: #4f46e5; color: #fff; border-radius: 50%;
+    width: 24px; height: 24px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+  }
+
+  .files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .files-grid { grid-template-columns: 1fr; } }
+
+  .file-drop {
+    border: 2px dashed #c7d2fe; border-radius: 10px; padding: 24px 16px;
+    text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    position: relative; background: #f8f9ff;
+  }
+  .file-drop:hover, .file-drop.dragover { border-color: #4f46e5; background: #eef2ff; }
+  .file-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .file-drop .icon { font-size: 2rem; margin-bottom: 8px; }
+  .file-drop .label { font-size: 0.85rem; color: #666; }
+  .file-drop .filename { font-size: 0.9rem; font-weight: 600; color: #4f46e5; margin-top: 6px; word-break: break-all; }
+
+  .sheet-select-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .sheet-select-row label { font-size: 0.8rem; color: #555; white-space: nowrap; }
+
+  select {
+    border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 10px;
+    font-size: 0.85rem; color: #333; background: #fff; cursor: pointer; flex: 1; min-width: 0;
+  }
+  select:focus { outline: 2px solid #4f46e5; outline-offset: 1px; }
+
+  .join-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 500px) { .join-options { grid-template-columns: 1fr; } }
+
+  .join-opt {
+    border: 2px solid #e5e7eb; border-radius: 10px; padding: 14px 10px;
+    text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; user-select: none;
+  }
+  .join-opt:hover { border-color: #a5b4fc; background: #f8f9ff; }
+  .join-opt input[type="radio"] { display: none; }
+  .join-opt.selected { border-color: #4f46e5; background: #eef2ff; }
+  .join-opt .join-icon { font-size: 1.5rem; margin-bottom: 4px; }
+  .join-opt .join-name { font-size: 0.85rem; font-weight: 600; color: #333; }
+  .join-opt .join-desc { font-size: 0.72rem; color: #777; margin-top: 2px; }
+
+  .key-pair {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 12px; align-items: end; margin-bottom: 10px;
+  }
+  @media (max-width: 600px) { .key-pair { grid-template-columns: 1fr; } }
+
+  .key-pair-header { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; margin-bottom: 4px; }
+  @media (max-width: 600px) { .key-pair-header { display: none; } }
+  .key-pair-header span { font-size: 0.78rem; font-weight: 600; color: #6b7280; }
+
+  .field-group label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; font-weight: 500; }
+
+  .btn-remove {
+    background: none; border: 1px solid #e5e7eb; border-radius: 6px; color: #9ca3af;
+    width: 32px; height: 32px; cursor: pointer; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-remove:hover { color: #ef4444; border-color: #fca5a5; }
+
+  .btn-add-key {
+    display: inline-flex; align-items: center; gap: 6px; background: none;
+    border: 1px dashed #a5b4fc; border-radius: 8px; color: #4f46e5;
+    font-size: 0.85rem; font-weight: 500; padding: 7px 14px; cursor: pointer;
+    margin-top: 4px; transition: background 0.2s;
+  }
+  .btn-add-key:hover { background: #eef2ff; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; border: none; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primary { background: #4f46e5; color: #fff; width: 100%; padding: 12px; font-size: 1rem; }
+  .btn-primary:hover:not(:disabled) { background: #4338ca; }
+
+  .btn-download { background: #059669; color: #fff; }
+  .btn-download:hover:not(:disabled) { background: #047857; }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-top: 16px;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-label {
+    font-size: 0.82rem; color: #555; margin-bottom: 8px;
+    display: flex; justify-content: space-between;
+  }
+  .progress-bar-track {
+    background: #e5e7eb; border-radius: 99px; height: 8px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; background: #4f46e5; border-radius: 99px;
+    transition: width 0.15s ease; width: 0%;
+  }
+
+  .preview-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  }
+  .row-count {
+    font-size: 0.82rem; color: #666; background: #f3f4f6;
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  th {
+    background: #f9fafb; padding: 8px 12px; text-align: left; font-weight: 600;
+    color: #374151; border-bottom: 2px solid #e5e7eb; white-space: nowrap; position: sticky; top: 0;
+  }
+  td {
+    padding: 7px 12px; border-bottom: 1px solid #f3f4f6;
+    white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+  }
+  tr:hover td { background: #f8f9ff; }
+  .null-cell { color: #bbb; font-style: italic; }
+
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-top: 12px; }
+  .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .alert-info  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+  #result-section { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Excel 結合ツール</h1>
+<p class="subtitle">2つのExcelファイルをキー列でJOINして1ファイルに結合します</p>
+
+<!-- Step 1 -->
+<div class="card">
+  <h2><span class="step-badge">1</span> Excelファイルをアップロード</h2>
+  <div class="files-grid">
+    <div>
+      <div class="file-drop" id="drop-a">
+        <input type="file" accept=".xlsx,.xls,.csv" id="file-a" />
+        <div class="icon">📄</div>
+        <div class="label">クリックまたはドラッグ＆ドロップ</div>
+        <div class="filename" id="name-a"></div>
+      </div>
+      <div class="sheet-select-row" id="sheet-row-a" style="display:none">
+        <label>シート:</label>
+        <select id="sheet-a"></select>
+      </div>
+    </div>
+    <div>
+      <div class="file-drop" id="drop-b">
+        <input type="file" accept=".xlsx,.xls,.csv" id="file-b" />
+        <div class="icon">📄</div>
+        <div class="label">クリックまたはドラッグ＆ドロップ</div>
+        <div class="filename" id="name-b"></div>
+      </div>
+      <div class="sheet-select-row" id="sheet-row-b" style="display:none">
+        <label>シート:</label>
+        <select id="sheet-b"></select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2 -->
+<div class="card">
+  <h2><span class="step-badge">2</span> キー列を選択</h2>
+  <div class="key-pair-header">
+    <span id="col-header-a">ファイルA</span>
+    <span id="col-header-b">ファイルB</span>
+    <span></span>
+  </div>
+  <div id="key-pairs-container"></div>
+  <button class="btn-add-key" onclick="addKeyPair()">＋ キーを追加</button>
+</div>
+
+<!-- Step 3 -->
+<div class="card">
+  <h2><span class="step-badge">3</span> 結合方法を選択</h2>
+  <div class="join-options">
+    <label class="join-opt selected" onclick="selectJoin('inner', this)">
+      <input type="radio" name="join" value="inner" checked />
+      <div class="join-icon">🔵</div>
+      <div class="join-name">内部結合</div>
+      <div class="join-desc">両方に存在する行のみ</div>
+    </label>
+    <label class="join-opt" onclick="selectJoin('left', this)">
+      <input type="radio" name="join" value="left" />
+      <div class="join-icon">🔷</div>
+      <div class="join-name">左外部結合</div>
+      <div class="join-desc">ファイルAの全行 + Bの一致行</div>
+    </label>
+    <label class="join-opt" onclick="selectJoin('full', this)">
+      <input type="radio" name="join" value="full" />
+      <div class="join-icon">🟣</div>
+      <div class="join-name">完全外部結合</div>
+      <div class="join-desc">どちらかに存在する全行</div>
+    </label>
+  </div>
+</div>
+
+<!-- Step 4 -->
+<div class="card">
+  <h2><span class="step-badge">4</span> 結合を実行</h2>
+  <button class="btn btn-primary" id="run-btn" onclick="runJoin()" disabled>結合する</button>
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-label">
+      <span id="progress-text">処理中...</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+  </div>
+  <div id="run-error"></div>
+</div>
+
+<!-- Result -->
+<div class="card" id="result-section">
+  <div class="preview-header">
+    <h2 style="margin-bottom:0"><span class="step-badge" style="background:#059669">✓</span> 結果プレビュー</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="row-count" id="row-count"></span>
+      <button class="btn btn-download" onclick="downloadResult()">⬇ xlsx でダウンロード</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="preview-table"></table>
+  </div>
+  <div class="alert alert-info" style="margin-top:12px;font-size:0.78rem">
+    ※ プレビューは最大100行を表示しています。ダウンロードファイルには全件が含まれます。
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Web Worker のコード（Blob URL で起動）
+// ============================================================
+const WORKER_CODE = `
+importScripts('https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js');
+
+function parseFile(buffer, sheetName) {
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const name = sheetName || wb.SheetNames[0];
+  const ws = wb.Sheets[name];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+  return { sheetNames: wb.SheetNames, rows, selectedSheet: name };
+}
+
+function makeKey(row, keys) {
+  return keys.map(k => String(row[k] ?? '')).join('\\x00');
+}
+
+function joinData(dataA, dataB, pairs, type) {
+  const keysA = pairs.map(p => p.a);
+  const keysB = pairs.map(p => p.b);
+  const allColsA = dataA.length > 0 ? Object.keys(dataA[0]) : [];
+  const allColsB = dataB.length > 0 ? Object.keys(dataB[0]) : [];
+
+  const mapB = new Map();
+  dataB.forEach(row => {
+    const k = makeKey(row, keysB);
+    if (!mapB.has(k)) mapB.set(k, []);
+    mapB.get(k).push(row);
+  });
+
+  const result = [];
+  const usedBKeys = new Set();
+  const total = dataA.length + (type === 'full' ? dataB.length : 0);
+  let done = 0;
+  const REPORT_INTERVAL = Math.max(1, Math.floor(total / 100));
+
+  dataA.forEach((rowA, i) => {
+    const k = makeKey(rowA, keysA);
+    const bRows = mapB.get(k);
+
+    if (bRows && bRows.length > 0) {
+      usedBKeys.add(k);
+      bRows.forEach(rowB => {
+        const merged = {};
+        allColsA.forEach(c => merged[c] = rowA[c]);
+        allColsB.forEach(c => merged[c + '_B'] = rowB[c]);
+        result.push(merged);
+      });
+    } else if (type === 'left' || type === 'full') {
+      const merged = {};
+      allColsA.forEach(c => merged[c] = rowA[c]);
+      allColsB.forEach(c => merged[c + '_B'] = null);
+      result.push(merged);
+    }
+
+    done++;
+    if (done % REPORT_INTERVAL === 0) {
+      self.postMessage({ type: 'progress', pct: Math.round(done / total * 90), text: 'JOIN処理中...' });
+    }
+  });
+
+  if (type === 'full') {
+    dataB.forEach(rowB => {
+      const k = makeKey(rowB, keysB);
+      if (!usedBKeys.has(k)) {
+        const merged = {};
+        allColsA.forEach(c => merged[c] = null);
+        keysA.forEach((ka, i) => merged[ka] = rowB[keysB[i]]);
+        allColsB.forEach(c => merged[c + '_B'] = rowB[c]);
+        result.push(merged);
+      }
+      done++;
+      if (done % REPORT_INTERVAL === 0) {
+        self.postMessage({ type: 'progress', pct: Math.round(done / total * 90 + 5), text: 'JOIN処理中（ファイルB残行）...' });
+      }
+    });
+  }
+
+  return result;
+}
+
+self.onmessage = function(e) {
+  const { cmd } = e.data;
+  try {
+    if (cmd === 'parse') {
+      self.postMessage({ type: 'progress', pct: 10, text: 'ファイルを読み込み中...' });
+      const result = parseFile(e.data.buffer, e.data.sheetName);
+      self.postMessage({ type: 'progress', pct: 80, text: 'データを解析中...' });
+      self.postMessage({ type: 'parsed', side: e.data.side, ...result });
+    } else if (cmd === 'join') {
+      self.postMessage({ type: 'progress', pct: 5, text: 'JOIN処理を開始...' });
+      const result = joinData(e.data.dataA, e.data.dataB, e.data.pairs, e.data.joinType);
+      self.postMessage({ type: 'progress', pct: 95, text: 'xlsx を生成中...' });
+      const ws = XLSX.utils.json_to_sheet(result);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Result');
+      const xlsxArr = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      const xlsxBuf = new Uint8Array(xlsxArr).buffer;
+      self.postMessage({ type: 'joined', result, xlsxBuf }, [xlsxBuf]);
+    }
+  } catch(err) {
+    self.postMessage({ type: 'error', message: err.message });
+  }
+};
+`;
+
+const workerBlob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+const workerUrl  = URL.createObjectURL(workerBlob);
+
+// ============================================================
+// メインスレッド
+// ============================================================
+let worker = null;
+let dataA = null, dataB = null, resultData = null, resultXlsx = null;
+let wbA = null, wbB = null;
+let fileNameA = 'ファイルA', fileNameB = 'ファイルB';
+let colsA = [], colsB = [];
+let joinType = 'inner';
+let keyPairCount = 0;
+
+function getWorker() {
+  if (!worker) {
+    worker = new Worker(workerUrl);
+    worker.onmessage = onWorkerMessage;
+    worker.onerror = e => showError('Workerエラー: ' + e.message);
+  }
+  return worker;
+}
+
+function onWorkerMessage(e) {
+  const msg = e.data;
+  if (msg.type === 'progress') {
+    setProgress(msg.pct, msg.text);
+  } else if (msg.type === 'parsed') {
+    onParsed(msg);
+  } else if (msg.type === 'joined') {
+    onJoined(msg);
+  } else if (msg.type === 'error') {
+    hideProgress();
+    showError(msg.message);
+  }
+}
+
+// ---- File loading ----
+function setupFile(inputId, dropId, side) {
+  const input = document.getElementById(inputId);
+  const drop  = document.getElementById(dropId);
+  input.addEventListener('change', () => loadFile(input.files[0], side));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0], side);
+  });
+}
+
+function loadFile(file, side) {
+  if (!file) return;
+  if (side === 'a') fileNameA = file.name;
+  else              fileNameB = file.name;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const buf = e.target.result;
+    showParseProgress(side);
+    getWorker().postMessage({ cmd: 'parse', side, buffer: buf }, [buf]);
+    document.getElementById('name-' + side).textContent = file.name;
+    document.getElementById('drop-' + side).querySelector('.icon').textContent = '⏳';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function onParsed(msg) {
+  const { side, sheetNames, rows, selectedSheet } = msg;
+  if (side === 'a') { dataA = rows; colsA = rows.length > 0 ? Object.keys(rows[0]) : []; }
+  else              { dataB = rows; colsB = rows.length > 0 ? Object.keys(rows[0]) : []; }
+
+  const sheetSel = document.getElementById('sheet-' + side);
+  const sheetRow = document.getElementById('sheet-row-' + side);
+  sheetSel.innerHTML = sheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+  sheetSel.value = selectedSheet;
+  sheetRow.style.display = sheetNames.length > 1 ? 'flex' : 'none';
+  sheetSel.onchange = () => reParseSheet(side);
+
+  const fname = side === 'a' ? fileNameA : fileNameB;
+  document.getElementById('col-header-' + side).textContent = `${fname}（${selectedSheet}）`;
+  document.getElementById('drop-' + side).querySelector('.icon').textContent = '✅';
+
+  refreshKeySelects(side);
+  if (document.querySelectorAll('.key-pair').length === 0) addKeyPair();
+  hideProgress();
+  checkReady();
+}
+
+function reParseSheet(side) {
+  const wb = side === 'a' ? wbA : wbB;
+  const sheetName = document.getElementById('sheet-' + side).value;
+  // Re-read from already-loaded workbook via postMessage re-parse is impossible without buffer.
+  // Instead, re-parse synchronously from stored workbook data.
+  // We store raw buffer for re-parse.
+  const buf = side === 'a' ? rawBufA : rawBufB;
+  showParseProgress(side);
+  const clone = buf.slice(0); // copy for transfer
+  getWorker().postMessage({ cmd: 'parse', side, buffer: clone, sheetName }, [clone]);
+}
+
+let rawBufA = null, rawBufB = null;
+
+// Override loadFile to also keep a copy of buffer
+const _origSetup = setupFile;
+function setupFile2(inputId, dropId, side) {
+  const input = document.getElementById(inputId);
+  const drop  = document.getElementById(dropId);
+  input.addEventListener('change', () => loadFile2(input.files[0], side));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) loadFile2(e.dataTransfer.files[0], side);
+  });
+}
+
+function loadFile2(file, side) {
+  if (!file) return;
+  if (side === 'a') fileNameA = file.name;
+  else              fileNameB = file.name;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const buf = e.target.result;
+    if (side === 'a') rawBufA = buf.slice(0);
+    else              rawBufB = buf.slice(0);
+    showParseProgress(side);
+    getWorker().postMessage({ cmd: 'parse', side, buffer: buf }, [buf]);
+    document.getElementById('name-' + side).textContent = file.name;
+    document.getElementById('drop-' + side).querySelector('.icon').textContent = '⏳';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showParseProgress(side) {
+  const label = side === 'a' ? fileNameA : fileNameB;
+  setProgress(0, `「${label}」を読み込み中...`);
+}
+
+// ---- Key pairs ----
+function refreshKeySelects(side) {
+  const cols = side === 'a' ? colsA : colsB;
+  document.querySelectorAll(`.key-sel-${side}`).forEach(sel => {
+    const prev = sel.value;
+    sel.innerHTML = cols.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (cols.includes(prev)) sel.value = prev;
+  });
+}
+
+function addKeyPair() {
+  keyPairCount++;
+  const id = keyPairCount;
+  const container = document.getElementById('key-pairs-container');
+  const optsA = colsA.length > 0 ? colsA.map(c => `<option value="${c}">${c}</option>`).join('') : '<option value="">— ファイルを読み込んでください —</option>';
+  const optsB = colsB.length > 0 ? colsB.map(c => `<option value="${c}">${c}</option>`).join('') : '<option value="">— ファイルを読み込んでください —</option>';
+  const div = document.createElement('div');
+  div.className = 'key-pair';
+  div.dataset.pairId = id;
+  div.innerHTML = `
+    <select class="key-sel-a" data-pair="${id}">${optsA}</select>
+    <select class="key-sel-b" data-pair="${id}">${optsB}</select>
+    <button class="btn-remove" onclick="removeKeyPair(${id})" title="削除">✕</button>
+  `;
+  container.appendChild(div);
+  updateRemoveButtons();
+}
+
+function removeKeyPair(id) {
+  const el = document.querySelector(`.key-pair[data-pair-id="${id}"]`);
+  if (el) el.remove();
+  updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+  const pairs = document.querySelectorAll('.key-pair');
+  pairs.forEach(p => {
+    p.querySelector('.btn-remove').style.visibility = pairs.length > 1 ? 'visible' : 'hidden';
+  });
+}
+
+function getKeyPairs() {
+  return Array.from(document.querySelectorAll('.key-pair')).map(p => ({
+    a: p.querySelector('.key-sel-a').value,
+    b: p.querySelector('.key-sel-b').value,
+  }));
+}
+
+function checkReady() {
+  document.getElementById('run-btn').disabled = !(dataA && dataB && dataA.length > 0 && dataB.length > 0);
+}
+
+// ---- Join ----
+function selectJoin(type, el) {
+  joinType = type;
+  document.querySelectorAll('.join-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function runJoin() {
+  const errEl = document.getElementById('run-error');
+  errEl.innerHTML = '';
+  const pairs = getKeyPairs();
+  if (pairs.some(p => !p.a || !p.b)) { showError('すべてのキー列を選択してください'); return; }
+  if (new Set(pairs.map(p => p.a)).size !== pairs.length) { showError('ファイルAのキー列が重複しています'); return; }
+
+  document.getElementById('run-btn').disabled = true;
+  setProgress(0, 'JOIN処理を開始...');
+  getWorker().postMessage({ cmd: 'join', dataA, dataB, pairs, joinType });
+}
+
+function onJoined(msg) {
+  resultData = msg.result;
+  resultXlsx = new Uint8Array(msg.xlsxBuf);
+  setProgress(100, '完了！');
+  setTimeout(() => {
+    hideProgress();
+    document.getElementById('run-btn').disabled = false;
+    showResult(resultData);
+  }, 400);
+}
+
+// ---- Progress ----
+function setProgress(pct, text) {
+  document.getElementById('progress-wrap').classList.add('visible');
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = text;
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+function hideProgress() {
+  document.getElementById('progress-wrap').classList.remove('visible');
+}
+function showError(msg) {
+  document.getElementById('run-error').innerHTML = `<div class="alert alert-error">${escHtml(msg)}</div>`;
+  document.getElementById('run-btn').disabled = false;
+}
+
+// ---- Preview ----
+function showResult(data) {
+  const section = document.getElementById('result-section');
+  const table   = document.getElementById('preview-table');
+  section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('row-count').textContent = `全 ${data.length} 行`;
+  if (data.length === 0) {
+    table.innerHTML = '<tr><td style="padding:16px;color:#888">一致する行がありませんでした</td></tr>';
+    return;
+  }
+  const cols = Object.keys(data[0]);
+  const preview = data.slice(0, 100);
+  const thead = '<thead><tr>' + cols.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr></thead>';
+  const tbody = '<tbody>' + preview.map(row =>
+    '<tr>' + cols.map(c => {
+      const v = row[c];
+      if (v === null || v === undefined) return '<td class="null-cell">—</td>';
+      return `<td title="${escHtml(String(v))}">${escHtml(String(v))}</td>`;
+    }).join('') + '</tr>'
+  ).join('') + '</tbody>';
+  table.innerHTML = thead + tbody;
+}
+
+// ---- Download ----
+function downloadResult() {
+  if (!resultXlsx) return;
+  const blob = new Blob([resultXlsx], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'merged_result.xlsx';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- Init ----
+setupFile2('file-a', 'drop-a', 'a');
+setupFile2('file-b', 'drop-b', 'b');
+addKeyPair();
+</script>
+</body>
+</html>
