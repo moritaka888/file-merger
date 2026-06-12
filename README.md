@@ -28,3 +28,8 @@ python file_merger.py a.txt b.txt -o merged.txt -s "\n===\n"
 ## 動作環境
 
 - Python 3.6 以上
+- 外部ライブラリ不要（標準ライブラリのみ使用）
+
+## ライセンス
+
+MIT
